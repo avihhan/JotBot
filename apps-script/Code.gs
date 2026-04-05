@@ -31,7 +31,8 @@ function doPost(e) {
 
 var JotBotApp = (function () {
   var commandHandlers_ = {
-    add_event: processAddEvent_
+    add_event: processAddEvent_,
+    note: processNote_
   };
 
   function handleWebhook(payload) {
@@ -39,18 +40,26 @@ var JotBotApp = (function () {
     var allowedSenders = JotBotConfig.getAllowedSenders(config);
     var messages = JotBotWhatsApp.parseIncomingMessages(payload);
 
+    Logger.log("Parsed " + messages.length + " message(s) from webhook payload");
     messages.forEach(function (message) {
       try {
+        Logger.log("Processing message id=" + message.id + " from=" + message.from);
         if (isDuplicateMessage_(message.id, config.idempotencyTtlSeconds)) {
+          Logger.log("Duplicate message, skipping: " + message.id);
           return;
         }
         if (!isSenderAllowed_(message.from, config, allowedSenders)) {
+          Logger.log("Sender not allowed: " + message.from);
           return;
         }
 
         var textForCommand = message.caption || message.text || "";
         var command = JotBotRules.parseCommand(textForCommand);
-        if (!commandHandlers_[command.command]) return;
+        Logger.log("Command detected: " + command.command + " | text: " + textForCommand);
+        if (!commandHandlers_[command.command]) {
+          Logger.log("No handler for command: " + command.command);
+          return;
+        }
         commandHandlers_[command.command](message, config);
       } catch (err) {
         console.error("Message processing failed:", err);
@@ -69,6 +78,65 @@ var JotBotApp = (function () {
       return allowedSenders.indexOf(normalizedSender) !== -1;
     }
     return true;
+  }
+
+  function processNote_(message, config) {
+    if (!config.notesSheetId) {
+      JotBotWhatsApp.sendTextMessage(
+        message.from,
+        "Notes are not configured yet. Ask the admin to set NOTES_SHEET_ID.",
+        message.id
+      );
+      return;
+    }
+
+    var messageTextRaw = message.caption || message.text || "";
+    var messageText = JotBotRules.stripCommandTag(messageTextRaw);
+
+    var draft = {};
+    try {
+      draft = messageText ? JotBotGemini.extractNoteDraftFromText(messageText) : {};
+    } catch (err) {
+      console.error("Gemini note extraction failed:", err);
+      appendDeadLetter("note_extraction_failure", { message: message, error: String(err) });
+      JotBotWhatsApp.sendTextMessage(
+        message.from,
+        "Could not process the note. Please try again.",
+        message.id
+      );
+      return;
+    }
+
+    if (!draft.text && messageText) {
+      draft.text = messageText;
+    }
+
+    var validated = JotBotRules.validateNoteDraft(draft);
+    if (!validated.ok) {
+      JotBotWhatsApp.sendTextMessage(
+        message.from,
+        "I need some text to save a note. Reply with #note followed by your note.",
+        message.id
+      );
+      return;
+    }
+
+    try {
+      NotesStore.appendNote(validated.draft, message.from, message.id, config.notesSheetId, config.notesSheetName);
+    } catch (err) {
+      console.error("NotesStore.appendNote failed:", err);
+      appendDeadLetter("note_storage_failure", { message: message, draft: validated.draft, error: String(err) });
+      JotBotWhatsApp.sendTextMessage(
+        message.from,
+        "Could not save the note. Please try again.",
+        message.id
+      );
+      return;
+    }
+
+    var confirmation = JotBotRules.buildNoteConfirmationMessage(validated.draft.title);
+    JotBotWhatsApp.sendTextMessage(message.from, confirmation, message.id);
+    console.log(JSON.stringify({ type: "note_saved", messageId: message.id, title: validated.draft.title }));
   }
 
   function processAddEvent_(message, config) {

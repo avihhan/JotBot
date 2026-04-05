@@ -17,7 +17,7 @@ var JotBotConfig = (function () {
       enforceAllowedSenders: (props.getProperty("ENFORCE_ALLOWED_SENDERS") || "false") === "true",
       allowedSendersCsv: props.getProperty("ALLOWED_SENDERS_CSV") || "",
       geminiApiKey: props.getProperty("GEMINI_API_KEY") || "",
-      geminiModel: props.getProperty("GEMINI_MODEL") || "gemini-2.0-flash",
+      geminiModel: props.getProperty("GEMINI_MODEL") || "gemini-2.5-flash",
       defaultTimezone: props.getProperty("DEFAULT_TIMEZONE") || Session.getScriptTimeZone() || "UTC",
       defaultDurationMinutes: Number(props.getProperty("DEFAULT_DURATION_MINUTES") || "60"),
       defaultCalendarId: props.getProperty("DEFAULT_CALENDAR_ID") || "primary",
@@ -25,7 +25,9 @@ var JotBotConfig = (function () {
       colorMapJson: props.getProperty("COLOR_MAP_JSON") || "{}",
       deadLetterSheetId: props.getProperty("DEAD_LETTER_SHEET_ID") || "",
       deadLetterSheetName: props.getProperty("DEAD_LETTER_SHEET_NAME") || "DeadLetter",
-      idempotencyTtlSeconds: Number(props.getProperty("IDEMPOTENCY_TTL_SECONDS") || "21600")
+      idempotencyTtlSeconds: Number(props.getProperty("IDEMPOTENCY_TTL_SECONDS") || "21600"),
+      notesSheetId: props.getProperty("NOTES_SHEET_ID") || "",
+      notesSheetName: props.getProperty("NOTES_SHEET_NAME") || "Notes"
     };
   }
 
