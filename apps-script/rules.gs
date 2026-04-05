@@ -122,10 +122,11 @@ var JotBotRules = (function () {
   return { ok: true, draft: d };
 }
 
-  function buildNoteConfirmationMessage(title) {
-    if (title) return "Noted: " + title;
-    return "Note saved.";
-  }
+  function buildNoteConfirmationMessage(title, text) {
+  if (title) return "Saved note: " + title;
+  if (text) return "Saved note.";
+  return "Note saved.";
+}
 
   function uniquePositiveInts_(value, index, arr) {
     if (typeof value !== "number" || value <= 0 || Math.floor(value) !== value) return false;
