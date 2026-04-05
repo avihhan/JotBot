@@ -2,9 +2,11 @@ var JotBotRules = (function () {
   function parseCommand(text) {
     var raw = (text || "").trim();
     var normalized = raw.toLowerCase();
-    var hasAddEvent = /#\s*(add\s*event|addevent|event)\b/.test(normalized);
-    if (hasAddEvent) {
+    if (/#\s*(add\s*event|addevent|event)\b/.test(normalized)) {
       return { command: "add_event", rawText: raw };
+    }
+    if (/#\s*(note|jot)\b/.test(normalized)) {
+      return { command: "note", rawText: raw };
     }
     return { command: "none", rawText: raw };
   }
@@ -12,6 +14,7 @@ var JotBotRules = (function () {
   function stripCommandTag(text) {
     return String(text || "")
       .replace(/#\s*(add\s*event|addevent|event)\b/gi, "")
+      .replace(/#\s*(note|jot)\b/gi, "")
       .trim();
   }
 
@@ -98,6 +101,22 @@ var JotBotRules = (function () {
     return "Added: " + eventTitle + " — " + when;
   }
 
+  function validateNoteDraft(draft) {
+    var d = clone_(draft || {});
+    d.text = (d.text || "").trim();
+    d.title = (d.title || "").trim();
+    d.tags = Array.isArray(d.tags) ? d.tags.map(function (t) { return String(t).toLowerCase().trim(); }).filter(Boolean) : [];
+    if (!d.text) {
+      return { ok: false, draft: d };
+    }
+    return { ok: true, draft: d };
+  }
+
+  function buildNoteConfirmationMessage(title) {
+    if (title) return "Noted: " + title;
+    return "Note saved.";
+  }
+
   function uniquePositiveInts_(value, index, arr) {
     if (typeof value !== "number" || value <= 0 || Math.floor(value) !== value) return false;
     return arr.indexOf(value) === index;
@@ -129,6 +148,8 @@ var JotBotRules = (function () {
     applyHints: applyHints,
     validateAndNormalizeDraft: validateAndNormalizeDraft,
     buildClarificationMessage: buildClarificationMessage,
-    buildConfirmationMessage: buildConfirmationMessage
+    buildConfirmationMessage: buildConfirmationMessage,
+    validateNoteDraft: validateNoteDraft,
+    buildNoteConfirmationMessage: buildNoteConfirmationMessage
   };
 })();

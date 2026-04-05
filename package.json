@@ -1,0 +1,14 @@
+{
+  "name": "jotbot",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "push": "clasp push",
+    "pull": "clasp pull",
+    "deploy": "clasp deploy",
+    "open": "clasp open"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.0.0"
+  }
+}

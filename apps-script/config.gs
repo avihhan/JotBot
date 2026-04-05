@@ -25,7 +25,9 @@ var JotBotConfig = (function () {
       colorMapJson: props.getProperty("COLOR_MAP_JSON") || "{}",
       deadLetterSheetId: props.getProperty("DEAD_LETTER_SHEET_ID") || "",
       deadLetterSheetName: props.getProperty("DEAD_LETTER_SHEET_NAME") || "DeadLetter",
-      idempotencyTtlSeconds: Number(props.getProperty("IDEMPOTENCY_TTL_SECONDS") || "21600")
+      idempotencyTtlSeconds: Number(props.getProperty("IDEMPOTENCY_TTL_SECONDS") || "21600"),
+      notesSheetId: props.getProperty("NOTES_SHEET_ID") || "",
+      notesSheetName: props.getProperty("NOTES_SHEET_NAME") || "Notes"
     };
   }
 
