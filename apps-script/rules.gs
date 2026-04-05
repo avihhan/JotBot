@@ -195,6 +195,9 @@ function extractTagsFromText_(text) {
     buildClarificationMessage: buildClarificationMessage,
     buildConfirmationMessage: buildConfirmationMessage,
     validateNoteDraft: validateNoteDraft,
-    buildNoteConfirmationMessage: buildNoteConfirmationMessage
+    buildNoteConfirmationMessage: buildNoteConfirmationMessage,
+    buildDirectNoteDraft: buildDirectNoteDraft,
+    mergeNoteDrafts: mergeNoteDrafts,
+    deriveNoteTitle: deriveNoteTitle,
   };
 })();
