@@ -102,15 +102,25 @@ var JotBotRules = (function () {
   }
 
   function validateNoteDraft(draft) {
-    var d = clone_(draft || {});
-    d.text = (d.text || "").trim();
-    d.title = (d.title || "").trim();
-    d.tags = Array.isArray(d.tags) ? d.tags.map(function (t) { return String(t).toLowerCase().trim(); }).filter(Boolean) : [];
-    if (!d.text) {
-      return { ok: false, draft: d };
-    }
-    return { ok: true, draft: d };
+  var d = clone_(draft || {});
+  d.text = (d.text || "").trim();
+  d.title = (d.title || "").trim();
+  d.tags = Array.isArray(d.tags)
+    ? d.tags.map(function (t) { return String(t).toLowerCase().trim(); }).filter(Boolean)
+    : [];
+
+  if (!d.text) {
+    return { ok: false, draft: d };
   }
+
+  if (!d.title) {
+    d.title = deriveNoteTitle(d.text);
+  }
+
+  d.tags = dedupe_(d.tags);
+
+  return { ok: true, draft: d };
+}
 
   function buildNoteConfirmationMessage(title) {
     if (title) return "Noted: " + title;
