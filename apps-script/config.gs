@@ -17,7 +17,7 @@ var JotBotConfig = (function () {
       enforceAllowedSenders: (props.getProperty("ENFORCE_ALLOWED_SENDERS") || "false") === "true",
       allowedSendersCsv: props.getProperty("ALLOWED_SENDERS_CSV") || "",
       geminiApiKey: props.getProperty("GEMINI_API_KEY") || "",
-      geminiModel: props.getProperty("GEMINI_MODEL") || "gemini-2.0-flash",
+      geminiModel: props.getProperty("GEMINI_MODEL") || "gemini-2.5-flash",
       defaultTimezone: props.getProperty("DEFAULT_TIMEZONE") || Session.getScriptTimeZone() || "UTC",
       defaultDurationMinutes: Number(props.getProperty("DEFAULT_DURATION_MINUTES") || "60"),
       defaultCalendarId: props.getProperty("DEFAULT_CALENDAR_ID") || "primary",

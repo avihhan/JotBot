@@ -40,18 +40,26 @@ var JotBotApp = (function () {
     var allowedSenders = JotBotConfig.getAllowedSenders(config);
     var messages = JotBotWhatsApp.parseIncomingMessages(payload);
 
+    Logger.log("Parsed " + messages.length + " message(s) from webhook payload");
     messages.forEach(function (message) {
       try {
+        Logger.log("Processing message id=" + message.id + " from=" + message.from);
         if (isDuplicateMessage_(message.id, config.idempotencyTtlSeconds)) {
+          Logger.log("Duplicate message, skipping: " + message.id);
           return;
         }
         if (!isSenderAllowed_(message.from, config, allowedSenders)) {
+          Logger.log("Sender not allowed: " + message.from);
           return;
         }
 
         var textForCommand = message.caption || message.text || "";
         var command = JotBotRules.parseCommand(textForCommand);
-        if (!commandHandlers_[command.command]) return;
+        Logger.log("Command detected: " + command.command + " | text: " + textForCommand);
+        if (!commandHandlers_[command.command]) {
+          Logger.log("No handler for command: " + command.command);
+          return;
+        }
         commandHandlers_[command.command](message, config);
       } catch (err) {
         console.error("Message processing failed:", err);
