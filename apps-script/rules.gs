@@ -140,6 +140,40 @@ var JotBotRules = (function () {
     return JSON.parse(JSON.stringify(obj || {}));
   }
 
+  function buildDirectNoteDraft(text) {
+  var cleaned = String(text || "").trim();
+  return {
+    title: deriveNoteTitle(cleaned),
+    text: cleaned,
+    tags: extractTagsFromText_(cleaned),
+    confidence: 1.0
+  };
+}
+
+function mergeNoteDrafts(imageDraft, textDraft) {
+  var merged = clone_(imageDraft || {});
+  var text = textDraft || {};
+  Object.keys(text).forEach(function (key) {
+    var value = text[key];
+    if (isMeaningful_(value)) merged[key] = value;
+  });
+  return merged;
+}
+
+function deriveNoteTitle(text) {
+  var cleaned = String(text || "").trim();
+  if (!cleaned) return "";
+  var words = cleaned.split(/\s+/).slice(0, 5);
+  return words.join(" ");
+}
+
+function extractTagsFromText_(text) {
+  var matches = String(text || "").match(/#([a-zA-Z0-9_-]+)/g) || [];
+  return matches.map(function (tag) {
+    return tag.replace(/^#/, "").toLowerCase();
+  });
+}
+
   return {
     parseCommand: parseCommand,
     stripCommandTag: stripCommandTag,
