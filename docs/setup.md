@@ -1,9 +1,10 @@
 # JotBot V1 Setup
 
-## 1) Create Apps Script project
-1. Create a new Apps Script project.
-2. Add all files from `apps-script/` into the script editor.
-3. Ensure `appsscript.json` includes required scopes.
+## 1) Create Apps Script project and push code
+1. Create a new project at [script.google.com](https://script.google.com).
+2. Copy the **Script ID** from Project Settings.
+3. Paste it into `.clasp.json` at the repo root: `"scriptId": "YOUR_ID"`.
+4. Run `npm install` then `npm run push` to sync all files from `apps-script/`.
 
 ## 2) Configure Script Properties
 Set these in **Project Settings -> Script properties**:
