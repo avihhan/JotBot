@@ -195,6 +195,17 @@ var JotBotApp = (function () {
     var cacheKey = "msg:" + messageId;
     if (cache.get(cacheKey)) return true;
 
+    var config = JotBotConfig.getConfig();
+    if (JotBotFirestore.isConfigured(config)) {
+      var result = JotBotFirestore.checkAndRecord(messageId, ttlSeconds, config);
+      if (result === true) return true;
+      if (result === false) {
+        cache.put(cacheKey, "1", ttlSeconds || 21600);
+        return false;
+      }
+      Logger.log("Firestore unavailable, falling back to Script Properties");
+    }
+
     var props = PropertiesService.getScriptProperties();
     var propKey = "processed_" + messageId;
     if (props.getProperty(propKey)) return true;

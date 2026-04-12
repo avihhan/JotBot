@@ -6,7 +6,8 @@
     "push": "clasp push",
     "pull": "clasp pull",
     "deploy": "clasp deploy",
-    "open": "clasp open"
+    "open": "clasp open",
+    "sync-env": "node scripts/sync-env.js"
   },
   "devDependencies": {
     "@google/clasp": "^3.0.0"

@@ -7,7 +7,12 @@
 4. Run `npm install` then `npm run push` to sync all files from `apps-script/`.
 
 ## 2) Configure Script Properties
-Set these in **Project Settings -> Script properties**:
+
+All configuration lives in the `.env` file at the repo root. You can either:
+- **Sync automatically** with `npm run sync-env` (see below), or
+- **Set manually** in **Project Settings -> Script properties** in the Apps Script editor.
+
+### Core properties
 
 - `WA_VERIFY_TOKEN`
 - `WA_ACCESS_TOKEN`
@@ -27,6 +32,49 @@ Set these in **Project Settings -> Script properties**:
 - `DEAD_LETTER_SHEET_ID` (optional, for failures)
 - `DEAD_LETTER_SHEET_NAME` (optional, default `DeadLetter`)
 - `IDEMPOTENCY_TTL_SECONDS` (default `21600`)
+
+### Firestore idempotency (optional, recommended)
+
+If configured, duplicate-message detection uses Firestore instead of Script Properties,
+preventing unbounded property growth. When these are not set, the legacy Script Properties
+fallback is used automatically.
+
+- `FIRESTORE_PROJECT_ID` — your GCP project id
+- `FIRESTORE_DATABASE_ID` (default `(default)` — set if you created a named database, e.g. `jotbot-db`)
+- `FIRESTORE_IDEMPOTENCY_COLLECTION` (default `jotbot_idempotency`)
+- `GCP_SERVICE_ACCOUNT_JSON` — the **full JSON key** of a service account with **Cloud Datastore User** role (paste the minified JSON string)
+
+#### GCP one-time setup
+
+1. In the [GCP Console](https://console.cloud.google.com), create or select a project.
+2. Enable the **Cloud Firestore API** and create a database in **Native mode**.
+3. Create a **service account** and grant it the `roles/datastore.user` role.
+4. Create a **JSON key** for the service account and paste the entire contents into `GCP_SERVICE_ACCOUNT_JSON` in your `.env`.
+5. Set `FIRESTORE_PROJECT_ID` to the project id.
+6. **(Recommended)** In Firestore console, add a **TTL policy** on the collection (default `jotbot_idempotency`) for the `expiresAt` field so old documents are deleted automatically.
+
+### Syncing `.env` to Script Properties
+
+Instead of copying values by hand, you can push all `.env` variables to Apps Script in one command:
+
+```
+npm run sync-env
+```
+
+#### One-time `clasp run` setup
+
+`sync-env` uses `clasp run` under the hood, which requires OAuth Desktop credentials:
+
+1. In **GCP Console > APIs & Services > Enabled APIs**, enable the **Apps Script API**.
+2. Go to **APIs & Services > Credentials > + Create Credentials > OAuth client ID**.
+   - Application type: **Desktop app**
+   - Name: e.g. `clasp-cli`
+3. Download the JSON credentials file.
+4. Run:
+   ```
+   npx clasp login --creds <path-to-downloaded-credentials.json>
+   ```
+5. You can now run `npm run sync-env` anytime to push `.env` values to Script Properties.
 
 ## 3) Deploy webhook endpoint
 1. Deploy Apps Script as a **Web App**.

@@ -27,7 +27,11 @@ var JotBotConfig = (function () {
       deadLetterSheetName: props.getProperty("DEAD_LETTER_SHEET_NAME") || "DeadLetter",
       idempotencyTtlSeconds: Number(props.getProperty("IDEMPOTENCY_TTL_SECONDS") || "21600"),
       notesSheetId: props.getProperty("NOTES_SHEET_ID") || "",
-      notesSheetName: props.getProperty("NOTES_SHEET_NAME") || "Notes"
+      notesSheetName: props.getProperty("NOTES_SHEET_NAME") || "Notes",
+      firestoreProjectId: props.getProperty("FIRESTORE_PROJECT_ID") || "",
+      firestoreDatabaseId: props.getProperty("FIRESTORE_DATABASE_ID") || "(default)",
+      firestoreIdempotencyCollection: props.getProperty("FIRESTORE_IDEMPOTENCY_COLLECTION") || "jotbot_idempotency",
+      gcpServiceAccountJson: props.getProperty("GCP_SERVICE_ACCOUNT_JSON") || ""
     };
   }
 
