@@ -4,12 +4,13 @@
 1. Create a new project at [script.google.com](https://script.google.com).
 2. Copy the **Script ID** from Project Settings.
 3. Paste it into `.clasp.json` at the repo root: `"scriptId": "YOUR_ID"`.
-4. Run `npm install` then `npm run push` to sync all files from `apps-script/`.
+4. In Project Settings, under **Google Cloud Platform (GCP) Project**, click **Change project** and enter your GCP project number. This enables Firestore and Stackdriver logging.
+5. Run `npm install` then `npm run push` to sync all files from `apps-script/`.
 
 ## 2) Configure Script Properties
 
 All configuration lives in the `.env` file at the repo root. You can either:
-- **Sync automatically** with `npm run sync-env` (see below), or
+- **Sync with `npm run sync-env`** (see below), or
 - **Set manually** in **Project Settings -> Script properties** in the Apps Script editor.
 
 ### Core properties
@@ -22,13 +23,13 @@ All configuration lives in the `.env` file at the repo root. You can either:
 - `ENFORCE_SELF_ONLY` (`true` recommended)
 - `ENFORCE_ALLOWED_SENDERS` (`false` by default; set `true` to restrict who can trigger JotBot)
 - `ALLOWED_SENDERS_CSV` (comma-separated international numbers, used when `ENFORCE_ALLOWED_SENDERS=true`)
-- `GEMINI_API_KEY`
-- `GEMINI_MODEL` (default `gemini-2.0-flash`)
+- `GEMINI_API_KEY` (standard `AIzaSy...` key from [AI Studio](https://aistudio.google.com/apikey))
+- `GEMINI_MODEL` (default `gemini-2.5-flash`)
 - `DEFAULT_TIMEZONE` (example: `America/New_York`)
 - `DEFAULT_DURATION_MINUTES` (example: `60`)
 - `DEFAULT_CALENDAR_ID` (Google Calendar ID or `primary`)
-- `CALENDAR_MAP_JSON` (example: `{\"work\":\"work@group.calendar.google.com\",\"personal\":\"primary\"}`)
-- `COLOR_MAP_JSON` (example: `{\"meeting\":\"PALE_BLUE\",\"task\":\"PALE_GREEN\",\"priority\":\"RED\"}`)
+- `CALENDAR_MAP_JSON` (example: `{"work":"work@group.calendar.google.com","personal":"primary"}`)
+- `COLOR_MAP_JSON` (example: `{"meeting":"PALE_BLUE","task":"PALE_GREEN","priority":"RED"}`)
 - `DEAD_LETTER_SHEET_ID` (optional, for failures)
 - `DEAD_LETTER_SHEET_NAME` (optional, default `DeadLetter`)
 - `IDEMPOTENCY_TTL_SECONDS` (default `21600`)
@@ -55,47 +56,50 @@ fallback is used automatically.
 
 ### Syncing `.env` to Script Properties
 
-Instead of copying values by hand, you can push all `.env` variables to Apps Script in one command:
+Instead of copying values by hand, you can push all `.env` variables to Apps Script:
 
 ```
 npm run sync-env
 ```
 
-#### One-time `clasp run` setup
+This generates a temporary `_syncProps.gs` file with your values baked in and pushes it to Apps Script. Then:
 
-`sync-env` uses `clasp run` under the hood, which requires OAuth Desktop credentials:
-
-1. In **GCP Console > APIs & Services > Enabled APIs**, enable the **Apps Script API**.
-2. Go to **APIs & Services > Credentials > + Create Credentials > OAuth client ID**.
-   - Application type: **Desktop app**
-   - Name: e.g. `clasp-cli`
-3. Download the JSON credentials file.
-4. Run:
-   ```
-   npx clasp login --creds <path-to-downloaded-credentials.json>
-   ```
-5. You can now run `npm run sync-env` anytime to push `.env` values to Script Properties.
+1. Open the Apps Script editor
+2. Select `_syncProps.gs` and run `_syncAllProperties()`
+3. Grant permissions when prompted
+4. Verify in **Project Settings → Script properties** that all values are set
+5. Clean up: `npm run sync-env-cleanup`
 
 ## 3) Deploy webhook endpoint
-1. Deploy Apps Script as a **Web App**.
-2. Execute as: your account.
-3. Who has access: Anyone.
-4. Copy deployment URL.
+
+**Deploy from the Apps Script editor** (not the CLI — `clasp deploy` does not set access permissions):
+
+1. Click **Deploy → New deployment**
+2. Select type: **Web app**
+3. Execute as: **Me**
+4. Who has access: **Anyone**
+5. Click **Deploy** and copy the URL
+
+> After every `npm run push`, update the deployment: **Deploy → Manage deployments → Edit → New version → Deploy**.
 
 ## 4) Configure Meta WhatsApp webhook
-1. In Meta developer dashboard, configure webhook callback URL to Apps Script Web App URL.
+
+1. In [Meta Developer Dashboard](https://developers.facebook.com), configure webhook callback URL to your Apps Script Web App URL.
 2. Set verify token exactly to `WA_VERIFY_TOKEN`.
 3. Subscribe to message events.
 
 ## 5) Quick smoke test
-Send to your own WhatsApp number:
+
+Send to your WhatsApp bot number:
 - `#add event Team sync tomorrow 8:30 pm high priority remind me 20 min`
 
 Expected:
 - Event is created in Google Calendar.
 - WhatsApp reply similar to: `Added: Team sync — Tue, Apr 7 8:30 PM`.
+- If Firestore is configured, a document appears in the `jotbot_idempotency` collection.
 
 ## Business account inbox mode
+
 If users will message your JotBot business number (instead of self-messages):
 - Set `ENFORCE_SELF_ONLY=false`
 - Option A (open): keep `ENFORCE_ALLOWED_SENDERS=false`

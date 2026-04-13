@@ -20,7 +20,8 @@ The app runs entirely on Google Apps Script (no server required). Code lives in 
 - [clasp](https://github.com/google/clasp) installed globally: `npm install -g @google/clasp`
 - A Google account with [Apps Script API enabled](https://script.google.com/home/usersettings)
 - A [Meta WhatsApp Cloud API](https://developers.facebook.com/docs/whatsapp/cloud-api/) app with a phone number
-- A [Gemini API key](https://aistudio.google.com/app/apikey)
+- A [Gemini API key](https://aistudio.google.com/apikey) (standard `AIzaSy...` key, **not** service-account-bound)
+- **(Optional)** A [GCP project](https://console.cloud.google.com) with Firestore for scalable idempotency
 
 ---
 
@@ -86,7 +87,17 @@ npm run open    # open the project in the Apps Script editor
 
 ## Configure Script Properties
 
-In the Apps Script editor, go to **Project Settings → Script properties** and add the following:
+All configuration lives in the `.env` file at the repo root. You can sync it to Apps Script in one step:
+
+```bash
+npm run sync-env
+```
+
+This generates a temporary `_syncProps.gs` file, pushes it to Apps Script, and you run `_syncAllProperties()` from the editor. Afterwards clean up with `npm run sync-env-cleanup`.
+
+Alternatively, set properties manually in **Project Settings → Script properties**.
+
+### Core properties
 
 | Property | Description |
 |---|---|
@@ -94,8 +105,8 @@ In the Apps Script editor, go to **Project Settings → Script properties** and 
 | `WA_PHONE_NUMBER_ID` | WhatsApp phone number ID from Meta dashboard |
 | `WA_VERIFY_TOKEN` | Any secret string — used to verify the webhook |
 | `WA_API_VERSION` | Default: `v21.0` |
-| `GEMINI_API_KEY` | Google Gemini API key |
-| `GEMINI_MODEL` | Default: `gemini-2.0-flash` |
+| `GEMINI_API_KEY` | Google Gemini API key (`AIzaSy...` from [AI Studio](https://aistudio.google.com/apikey)) |
+| `GEMINI_MODEL` | Default: `gemini-2.5-flash` |
 | `SELF_WHATSAPP_NUMBER` | Your WhatsApp number with country code (e.g. `15551234567`) |
 | `ENFORCE_SELF_ONLY` | `true` to restrict to your number only (recommended to start) |
 | `DEFAULT_TIMEZONE` | IANA timezone string (e.g. `America/New_York`) |
@@ -108,23 +119,42 @@ In the Apps Script editor, go to **Project Settings → Script properties** and 
 | `DEAD_LETTER_SHEET_ID` | Optional: Sheet ID to log failures |
 | `IDEMPOTENCY_TTL_SECONDS` | Default: `21600` (6 hours) |
 
-See `.env` for the full list of property names.
+### Firestore idempotency (optional, recommended)
+
+Without Firestore, idempotency records are stored in Script Properties, which grow unboundedly. Firestore + TTL auto-cleans old records.
+
+| Property | Description |
+|---|---|
+| `FIRESTORE_PROJECT_ID` | Your GCP project id |
+| `FIRESTORE_DATABASE_ID` | Firestore database name (default: `(default)`) |
+| `FIRESTORE_IDEMPOTENCY_COLLECTION` | Collection name (default: `jotbot_idempotency`) |
+| `GCP_SERVICE_ACCOUNT_JSON` | Full JSON key of a service account with **Cloud Datastore User** role |
+
+When these are not set, the legacy Script Properties fallback is used automatically.
+
+See [docs/setup.md](docs/setup.md) for detailed GCP setup instructions.
 
 ---
 
 ## Deploy and register the webhook
 
-### 1. Deploy as a Web App
+### 1. Link GCP project
 
-In the Apps Script editor: **Deploy → New deployment → Web app**
+In the Apps Script editor: **Project Settings → Google Cloud Platform (GCP) Project → Change project** and enter your GCP project number. This enables Firestore and Stackdriver logging.
+
+### 2. Deploy as a Web App
+
+In the Apps Script editor (**not** the CLI): **Deploy → New deployment → Web app**
 - Execute as: **Me**
 - Who has access: **Anyone**
 
 Copy the deployment URL.
 
-> Re-deploy after every `npm run push` to pick up code changes — use **Deploy → Manage deployments → Edit** and create a new version.
+> **Important:** `clasp deploy` from the CLI does not set access permissions. Always deploy or update from the editor UI.
+>
+> After every `npm run push`, update the deployment: **Deploy → Manage deployments → Edit → New version → Deploy**.
 
-### 2. Register the webhook with Meta
+### 3. Register the webhook with Meta
 
 In the [Meta Developer Dashboard](https://developers.facebook.com):
 1. Go to your WhatsApp app → **Configuration → Webhooks**
@@ -132,7 +162,7 @@ In the [Meta Developer Dashboard](https://developers.facebook.com):
 3. Set **Verify token** to the value of `WA_VERIFY_TOKEN`
 4. Click **Verify and Save**, then subscribe to the `messages` field
 
-### 3. Smoke test
+### 4. Smoke test
 
 Send this from your WhatsApp number to your JotBot number:
 
@@ -141,6 +171,8 @@ Send this from your WhatsApp number to your JotBot number:
 ```
 
 Expected response: `Added: Team sync — Tue, Apr 8 8:30 PM`
+
+If Firestore is configured, check the `jotbot_idempotency` collection — you should see a document with `processedAt` and `expiresAt` fields.
 
 ---
 
@@ -169,13 +201,17 @@ JotBot/
 │   ├── calendar.gs       # Google Calendar integration
 │   ├── whatsapp.gs       # WhatsApp Cloud API integration
 │   ├── notes.gs          # Google Sheets notes storage
+│   ├── firestore.gs      # Firestore REST client for idempotency
+│   ├── admin.gs          # Utility for syncing Script Properties
 │   ├── appsscript.json   # Apps Script manifest
 │   └── tests/            # Manual test cases
+├── scripts/
+│   └── sync-env.js       # Generates _syncProps.gs from .env and pushes
 ├── docs/
 │   ├── architecture.md   # System design and extensibility notes
 │   ├── commands.md       # User-facing command reference
 │   └── setup.md          # Detailed setup guide
 ├── .clasp.json           # clasp project config (scriptId + rootDir)
-├── .env                  # Script property names reference (no real secrets)
-└── package.json          # npm scripts for clasp push/pull/deploy
+├── .env                  # Local config values (gitignored)
+└── package.json          # npm scripts for clasp push/pull/deploy/sync-env
 ```
