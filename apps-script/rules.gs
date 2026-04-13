@@ -8,6 +8,12 @@ var JotBotRules = (function () {
     if (/#\s*(note|jot)\b/.test(normalized)) {
       return { command: "note", rawText: raw };
     }
+    if (/#\s*(cancel|delete)\b/.test(normalized)) {
+      return { command: "cancel", rawText: raw };
+    }
+    if (/#\s*help\b/.test(normalized)) {
+      return { command: "help", rawText: raw };
+    }
     return { command: "none", rawText: raw };
   }
 
@@ -15,6 +21,8 @@ var JotBotRules = (function () {
     return String(text || "")
       .replace(/#\s*(add\s*event|addevent|event)\b/gi, "")
       .replace(/#\s*(note|jot)\b/gi, "")
+      .replace(/#\s*(cancel|delete)\b/gi, "")
+      .replace(/#\s*help\b/gi, "")
       .trim();
   }
 
@@ -117,6 +125,22 @@ var JotBotRules = (function () {
     return "Note saved.";
   }
 
+  function buildHelpMessage() {
+    return [
+      "\ud83e\udd16 *JotBot Commands:*",
+      "",
+      "\u2022 `#add event <details>` \u2014 Schedule a Google Calendar event.",
+      '  _Example: "#add event Team sync tomorrow 3pm high priority"_',
+      "",
+      "\u2022 `#note <text>` \u2014 Save a quick note to Google Sheets.",
+      '  _Example: "#note Call dentist next week"_',
+      "",
+      "\u2022 `#cancel` \u2014 Delete the last event I created for you.",
+      "",
+      "\u2022 `#help` \u2014 Show this message."
+    ].join("\n");
+  }
+
   function uniquePositiveInts_(value, index, arr) {
     if (typeof value !== "number" || value <= 0 || Math.floor(value) !== value) return false;
     return arr.indexOf(value) === index;
@@ -150,6 +174,7 @@ var JotBotRules = (function () {
     buildClarificationMessage: buildClarificationMessage,
     buildConfirmationMessage: buildConfirmationMessage,
     validateNoteDraft: validateNoteDraft,
-    buildNoteConfirmationMessage: buildNoteConfirmationMessage
+    buildNoteConfirmationMessage: buildNoteConfirmationMessage,
+    buildHelpMessage: buildHelpMessage
   };
 })();

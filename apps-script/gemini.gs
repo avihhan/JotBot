@@ -19,6 +19,16 @@ var JotBotGemini = (function () {
     });
   }
 
+  function fetchWithRetry_(url, options) {
+    var response = UrlFetchApp.fetch(url, options);
+    var status = response.getResponseCode();
+    if (status === 429 || status === 500 || status === 503) {
+      Utilities.sleep(1500);
+      response = UrlFetchApp.fetch(url, options);
+    }
+    return response;
+  }
+
   function requestStructuredEvent_(opts) {
     var config = JotBotConfig.requireKeys(["geminiApiKey", "geminiModel"]);
     var url =
@@ -48,7 +58,7 @@ var JotBotGemini = (function () {
       }
     };
 
-    var response = UrlFetchApp.fetch(url, {
+    var response = fetchWithRetry_(url, {
       method: "post",
       contentType: "application/json",
       payload: JSON.stringify(payload),
@@ -101,17 +111,22 @@ var JotBotGemini = (function () {
     return [
       "You are extracting structured event details for Google Calendar.",
       "Respond in strict JSON only, no markdown, no extra keys.",
-      "Timezone default: " + timezone,
-      "Current timestamp: " + new Date().toISOString(),
+      "",
+      "IMPORTANT: The user is in the " + timezone + " timezone.",
+      "Interpret ALL times mentioned by the user (e.g. '3pm', 'tomorrow morning') as local to " + timezone + ".",
+      "All ISO-8601 datetime strings in your response MUST include the correct UTC offset for " + timezone + ".",
+      "For example, 3 PM US Eastern Daylight Time should be 2026-04-13T15:00:00-04:00, NOT 2026-04-13T15:00:00Z.",
+      "",
+      "Current timestamp (UTC): " + new Date().toISOString(),
       "If details are missing, include them in missing_fields.",
       "Schema keys:",
       "{",
       '  "intent":"create_event",',
       '  "title":"string",',
-      '  "start_datetime_iso":"ISO-8601 string",',
-      '  "end_datetime_iso":"ISO-8601 string or empty",',
+      '  "start_datetime_iso":"ISO-8601 with UTC offset, e.g. 2026-04-13T15:00:00-04:00",',
+      '  "end_datetime_iso":"ISO-8601 with UTC offset, or empty",',
       '  "duration_minutes":"number or null",',
-      '  "timezone":"IANA timezone string",',
+      '  "timezone":"' + timezone + '",',
       '  "description":"string",',
       '  "location":"string",',
       '  "meeting_link":"string",',
@@ -150,7 +165,7 @@ var JotBotGemini = (function () {
       }
     };
 
-    var response = UrlFetchApp.fetch(url, {
+    var response = fetchWithRetry_(url, {
       method: "post",
       contentType: "application/json",
       payload: JSON.stringify(payload),

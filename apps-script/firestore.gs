@@ -177,8 +177,101 @@ var JotBotFirestore = (function () {
     return null;
   }
 
+  function senderDocId_(sender) {
+    return "sender_" + sha256Hex_(String(sender || ""));
+  }
+
+  function saveLastAction(sender, actionData, config) {
+    if (!isConfigured(config)) return;
+    var token = getAccessToken_(config.gcpServiceAccountJson);
+    if (!token) return;
+
+    var url = documentUrl_(
+      config.firestoreProjectId,
+      config.firestoreDatabaseId,
+      config.firestoreIdempotencyCollection,
+      senderDocId_(sender)
+    );
+    var body = {
+      fields: {
+        type: { stringValue: actionData.type || "" },
+        itemId: { stringValue: actionData.itemId || "" },
+        calendarId: { stringValue: actionData.calendarId || "" },
+        title: { stringValue: actionData.title || "" },
+        createdAt: { timestampValue: new Date().toISOString() }
+      }
+    };
+    var res = UrlFetchApp.fetch(url, {
+      method: "patch",
+      muteHttpExceptions: true,
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      payload: JSON.stringify(body)
+    });
+    if (res.getResponseCode() >= 300) {
+      console.error("JotBotFirestore: saveLastAction failed", res.getResponseCode(), res.getContentText());
+    }
+  }
+
+  function getLastAction(sender, config) {
+    if (!isConfigured(config)) return null;
+    var token = getAccessToken_(config.gcpServiceAccountJson);
+    if (!token) return null;
+
+    var url = documentUrl_(
+      config.firestoreProjectId,
+      config.firestoreDatabaseId,
+      config.firestoreIdempotencyCollection,
+      senderDocId_(sender)
+    );
+    var res = UrlFetchApp.fetch(url, {
+      method: "get",
+      muteHttpExceptions: true,
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (res.getResponseCode() !== 200) return null;
+
+    try {
+      var doc = JSON.parse(res.getContentText());
+      var f = doc.fields || {};
+      return {
+        type: (f.type && f.type.stringValue) || "",
+        itemId: (f.itemId && f.itemId.stringValue) || "",
+        calendarId: (f.calendarId && f.calendarId.stringValue) || "",
+        title: (f.title && f.title.stringValue) || "",
+        createdAt: (f.createdAt && f.createdAt.timestampValue) ? new Date(f.createdAt.timestampValue) : null
+      };
+    } catch (e) {
+      console.error("JotBotFirestore: getLastAction parse error", e);
+      return null;
+    }
+  }
+
+  function deleteLastAction(sender, config) {
+    if (!isConfigured(config)) return;
+    var token = getAccessToken_(config.gcpServiceAccountJson);
+    if (!token) return;
+
+    var url = documentUrl_(
+      config.firestoreProjectId,
+      config.firestoreDatabaseId,
+      config.firestoreIdempotencyCollection,
+      senderDocId_(sender)
+    );
+    var res = UrlFetchApp.fetch(url, {
+      method: "delete",
+      muteHttpExceptions: true,
+      headers: { Authorization: "Bearer " + token }
+    });
+    if (res.getResponseCode() >= 300 && res.getResponseCode() !== 404) {
+      console.error("JotBotFirestore: deleteLastAction failed", res.getResponseCode(), res.getContentText());
+    }
+  }
+
   return {
     isConfigured: isConfigured,
-    checkAndRecord: checkAndRecord
+    checkAndRecord: checkAndRecord,
+    saveLastAction: saveLastAction,
+    getLastAction: getLastAction,
+    deleteLastAction: deleteLastAction
   };
 })();

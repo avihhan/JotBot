@@ -71,3 +71,46 @@ Save a quick note to Google Sheets from WhatsApp text.
 - Error / empty message:
   - `I need some text to save a note. Reply with #note followed by your note.`
 
+---
+
+## `#cancel`
+Delete the most recently created event.
+
+### Supported command forms
+- `#cancel`
+- `#delete`
+
+### Behavior
+- Looks up the last action recorded for the sender in Firestore.
+- If the action is within the cancel window (default 15 minutes, configurable via `CANCEL_TTL_SECONDS`), the Calendar event is deleted.
+- If no recent action exists or the window has expired, an informational message is returned.
+- After a successful cancel, the stored last-action record is cleared.
+- Requires Firestore to be configured; otherwise responds with an error message.
+
+### Examples
+- `#cancel`
+- `#delete`
+
+### Response format
+- Success:
+  - `🗑️ Successfully cancelled "<title>".`
+- Nothing to cancel:
+  - `Nothing to cancel.`
+- Expired:
+  - `Your last action was too long ago to cancel.`
+
+---
+
+## `#help`
+Display the list of available commands.
+
+### Supported command forms
+- `#help`
+
+### Behavior
+- Returns a formatted message listing all commands with brief descriptions and examples.
+- Also triggered automatically when the bot receives an unrecognized command.
+
+### Response format
+A formatted multi-line message listing `#add event`, `#note`, `#cancel`, and `#help`.
+

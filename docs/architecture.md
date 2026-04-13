@@ -1,7 +1,7 @@
 # JotBot Architecture (V1)
 
 ## Overview
-JotBot is a command-driven WhatsApp assistant. In V1 it supports `#add event` to create Google Calendar entries from WhatsApp text and/or images.
+JotBot is a command-driven WhatsApp assistant. It supports `#add event` for Google Calendar entries, `#note` for quick notes, `#cancel` to undo the last action, and `#help` for command discovery.
 
 Core principles:
 - Keep integrations isolated (`whatsapp`, `gemini`, `calendar`, `firestore` modules).
@@ -12,7 +12,7 @@ Core principles:
 ## Runtime flow
 1. Meta WhatsApp webhook sends updates to Apps Script `doPost`.
 2. Message parser extracts normalized payload (text, caption, image id, sender, message id).
-3. Router detects hashtag command (`#add event` aliases).
+3. Router detects hashtag command (`#add event`, `#note`, `#cancel`, `#help`). Unrecognized commands trigger the help message.
 4. Gemini extracts event data from:
    - text-only pass (caption/body)
    - image-only pass (if image exists)
@@ -31,11 +31,18 @@ For sender control, V1 supports:
   1. **CacheService** — fast in-memory check (TTL configurable via `IDEMPOTENCY_TTL_SECONDS`, default 6h).
   2. **Firestore** (optional, recommended) — persistent check using SHA-256 document ids with `expiresAt` TTL for automatic cleanup. Uses service-account JWT auth via the Firestore REST API (`firestore.gs`).
   3. **Script Properties** — legacy fallback when Firestore is not configured. Works but grows unboundedly.
+- **Gemini retry** — Gemini API calls use a single-retry wrapper (`fetchWithRetry_`). Retries once after 1.5 s on transient errors (429 Too Many Requests, 500, 503).
+- **Config pass-through** — `isDuplicateMessage_` receives the pre-loaded `config` object to avoid redundant `PropertiesService` reads.
 - Dead-letter sheet logging for parse/validation/runtime failures.
 - Clarification response when required fields are missing.
 - Safe defaults for timezone, duration, calendar, and color.
 
-## Extensibility path (`#note` and beyond)
+## Cancel / undo flow
+- After successfully creating an event, `processAddEvent_` records the action (event ID, calendar ID, title) in Firestore via `saveLastAction`.
+- `#cancel` retrieves the last action for the sender, checks it falls within `CANCEL_TTL_SECONDS` (default 900 s / 15 min), deletes the Calendar event, and clears the record.
+- Last-action documents are stored alongside idempotency records in the same Firestore collection (keyed by `sender_{sha256}`). They have no TTL field since they represent current state.
+
+## Extensibility path
 - Keep router command registry pattern (`command -> handler`).
 - Reuse ingress/parsing and Gemini utility modules.
 - Add a `NotesStore` abstraction (Google Sheets first, Firestore later) without touching calendar flow.
@@ -47,12 +54,12 @@ For sender control, V1 supports:
 |---|---|
 | `Code.gs` | Webhook entry (`doGet`/`doPost`), command router, idempotency |
 | `config.gs` | Reads all Script Properties into a config object |
-| `rules.gs` | Command parsing, validation, hint extraction, message formatting |
+| `rules.gs` | Command parsing (`#add event`, `#note`, `#cancel`, `#help`), validation, hint extraction, message formatting, help text |
 | `gemini.gs` | Gemini API calls for event/note extraction |
 | `calendar.gs` | Google Calendar event creation with color/calendar mapping |
 | `whatsapp.gs` | WhatsApp Cloud API (send messages, download media) |
 | `notes.gs` | Google Sheets note storage |
-| `firestore.gs` | Firestore REST client — service-account JWT auth, idempotency check/record |
+| `firestore.gs` | Firestore REST client — service-account JWT auth, idempotency check/record, last-action CRUD |
 | `admin.gs` | Utility function for syncing Script Properties via `sync-env` |
 
 ## Security notes

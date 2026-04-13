@@ -31,7 +31,8 @@ var JotBotConfig = (function () {
       firestoreProjectId: props.getProperty("FIRESTORE_PROJECT_ID") || "",
       firestoreDatabaseId: props.getProperty("FIRESTORE_DATABASE_ID") || "(default)",
       firestoreIdempotencyCollection: props.getProperty("FIRESTORE_IDEMPOTENCY_COLLECTION") || "jotbot_idempotency",
-      gcpServiceAccountJson: props.getProperty("GCP_SERVICE_ACCOUNT_JSON") || ""
+      gcpServiceAccountJson: props.getProperty("GCP_SERVICE_ACCOUNT_JSON") || "",
+      cancelTtlSeconds: Number(props.getProperty("CANCEL_TTL_SECONDS") || "900")
     };
   }
 

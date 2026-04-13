@@ -32,7 +32,9 @@ function doPost(e) {
 var JotBotApp = (function () {
   var commandHandlers_ = {
     add_event: processAddEvent_,
-    note: processNote_
+    note: processNote_,
+    cancel: processCancel_,
+    help: processHelp_
   };
 
   function handleWebhook(payload) {
@@ -44,7 +46,7 @@ var JotBotApp = (function () {
     messages.forEach(function (message) {
       try {
         Logger.log("Processing message id=" + message.id + " from=" + message.from);
-        if (isDuplicateMessage_(message.id, config.idempotencyTtlSeconds)) {
+        if (isDuplicateMessage_(message.id, config)) {
           Logger.log("Duplicate message, skipping: " + message.id);
           return;
         }
@@ -57,7 +59,7 @@ var JotBotApp = (function () {
         var command = JotBotRules.parseCommand(textForCommand);
         Logger.log("Command detected: " + command.command + " | text: " + textForCommand);
         if (!commandHandlers_[command.command]) {
-          Logger.log("No handler for command: " + command.command);
+          JotBotWhatsApp.sendTextMessage(message.from, JotBotRules.buildHelpMessage(), message.id);
           return;
         }
         commandHandlers_[command.command](message, config);
@@ -187,15 +189,70 @@ var JotBotApp = (function () {
     var confirmation = JotBotRules.buildConfirmationMessage(created.title, created.startDate, created.timezone);
     JotBotWhatsApp.sendTextMessage(message.from, confirmation, message.id);
     console.log(JSON.stringify({ type: "event_created", messageId: message.id, eventId: created.eventId, calendarId: created.calendarId }));
+
+    if (JotBotFirestore.isConfigured(config)) {
+      JotBotFirestore.saveLastAction(message.from, {
+        type: "event",
+        itemId: created.eventId,
+        calendarId: created.calendarId,
+        title: created.title
+      }, config);
+    }
   }
 
-  function isDuplicateMessage_(messageId, ttlSeconds) {
+  function processHelp_(message, config) {
+    JotBotWhatsApp.sendTextMessage(message.from, JotBotRules.buildHelpMessage(), message.id);
+  }
+
+  function processCancel_(message, config) {
+    if (!JotBotFirestore.isConfigured(config)) {
+      JotBotWhatsApp.sendTextMessage(message.from, "Cancel is not available — Firestore is not configured.", message.id);
+      return;
+    }
+
+    var lastAction = JotBotFirestore.getLastAction(message.from, config);
+    if (!lastAction || !lastAction.itemId) {
+      JotBotWhatsApp.sendTextMessage(message.from, "Nothing to cancel.", message.id);
+      return;
+    }
+
+    if (lastAction.createdAt) {
+      var ageSeconds = (Date.now() - lastAction.createdAt.getTime()) / 1000;
+      if (ageSeconds > (config.cancelTtlSeconds || 900)) {
+        JotBotWhatsApp.sendTextMessage(message.from, "Your last action was too long ago to cancel.", message.id);
+        JotBotFirestore.deleteLastAction(message.from, config);
+        return;
+      }
+    }
+
+    try {
+      if (lastAction.type === "event") {
+        var calendar = CalendarApp.getCalendarById(lastAction.calendarId) || CalendarApp.getDefaultCalendar();
+        var event = calendar.getEventById(lastAction.itemId);
+        if (event) {
+          event.deleteEvent();
+        }
+      }
+    } catch (err) {
+      console.error("processCancel_ deletion failed:", err);
+      JotBotWhatsApp.sendTextMessage(message.from, "Could not delete the item. It may have been removed already.", message.id);
+      JotBotFirestore.deleteLastAction(message.from, config);
+      return;
+    }
+
+    JotBotFirestore.deleteLastAction(message.from, config);
+    var title = lastAction.title ? ' "' + lastAction.title + '"' : "";
+    JotBotWhatsApp.sendTextMessage(message.from, "\ud83d\uddd1\ufe0f Successfully cancelled" + title + ".", message.id);
+    console.log(JSON.stringify({ type: "event_cancelled", messageId: message.id, itemId: lastAction.itemId }));
+  }
+
+  function isDuplicateMessage_(messageId, config) {
     if (!messageId) return false;
+    var ttlSeconds = config.idempotencyTtlSeconds;
     var cache = CacheService.getScriptCache();
     var cacheKey = "msg:" + messageId;
     if (cache.get(cacheKey)) return true;
 
-    var config = JotBotConfig.getConfig();
     if (JotBotFirestore.isConfigured(config)) {
       var result = JotBotFirestore.checkAndRecord(messageId, ttlSeconds, config);
       if (result === true) return true;
