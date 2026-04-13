@@ -2,7 +2,7 @@
 
 A command-driven WhatsApp assistant that creates Google Calendar events and saves notes — powered by Google Apps Script and Gemini AI.
 
-Send a WhatsApp message like `#add event Team sync tomorrow 3pm` and JotBot creates the Calendar event and replies with a confirmation. Send `#note` to save a quick note to Google Sheets.
+Send a WhatsApp message like `#add event Team sync tomorrow 3pm` and JotBot creates the Calendar event and replies with a confirmation. Send `#list today` or `#agenda` to see today's events. Send `#note` to save a quick note to Google Sheets.
 
 ## How it works
 
@@ -150,6 +150,7 @@ Expected response: `Added: Team sync — Tue, Apr 8 8:30 PM`
 |---|---|
 | `#add event <details>` | Creates a Google Calendar event |
 | `#addevent` / `#event` | Aliases for `#add event` |
+| `#list today` / `#agenda` | Lists today's events from the configured Google Calendar |
 | `#note <text>` | Saves a note to Google Sheets |
 | `#jot <text>` | Alias for `#note` |
 
