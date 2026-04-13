@@ -56,6 +56,14 @@
 - Input: `#add event standup tomorrow 9am` with configured `DEFAULT_TIMEZONE`.
 - Expected: Event time interpreted in configured timezone.
 
+13. Agenda with events
+- Input: `#list today` or `#agenda` on a day with existing calendar events.
+- Expected: Ordered list of today's events with times; all-day events shown as `All day`.
+
+14. Agenda with no events
+- Input: `#list today` on a day with no calendar events.
+- Expected: `No events today for <calendar_name>.`
+
 ## Suggested payload fixtures
 - Store raw webhook JSON examples for:
   - Text message

@@ -37,6 +37,31 @@ Create a Google Calendar event from WhatsApp text or image.
 
 ---
 
+## `#list today` / `#agenda`
+Show today's events from the configured Google Calendar.
+
+### Supported command forms
+- `#list today`
+- `#agenda`
+
+### Behavior
+- Reads events from `DEFAULT_CALENDAR_ID` or the fallback default calendar.
+- Returns events for the current day in `DEFAULT_TIMEZONE`.
+- All-day events are labeled `All day`.
+
+### Examples
+- `#list today`
+- `#agenda`
+
+### Response format
+- With events:
+  - `Today's agenda for <calendar_name>:`
+  - `<time> - <title>`
+- No events:
+  - `No events today for <calendar_name>.`
+
+---
+
 ## `#note`
 Save a quick note to Google Sheets from WhatsApp text.
 
@@ -70,4 +95,3 @@ Save a quick note to Google Sheets from WhatsApp text.
   - `Noted: <title>`
 - Error / empty message:
   - `I need some text to save a note. Reply with #note followed by your note.`
-

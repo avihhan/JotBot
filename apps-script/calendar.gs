@@ -1,8 +1,7 @@
 var JotBotCalendar = (function () {
   function createEventFromDraft(draft, startDate, endDate) {
     var config = JotBotConfig.getConfig();
-    var calendarId = resolveCalendarId_(draft.calendar_hint, config);
-    var calendar = CalendarApp.getCalendarById(calendarId) || CalendarApp.getDefaultCalendar();
+    var calendar = getCalendar_(resolveCalendarId_(draft.calendar_hint, config));
 
     var description = (draft.description || "").trim();
     if (draft.meeting_link) {
@@ -36,11 +35,52 @@ var JotBotCalendar = (function () {
     };
   }
 
+  function listEventsForToday(timezone) {
+    var config = JotBotConfig.getConfig();
+    var calendarId = resolveCalendarId_(null, config);
+    var calendar = getCalendar_(calendarId);
+    var range = buildTodayRange_(timezone || config.defaultTimezone);
+    var events = calendar.getEvents(range.startDate, range.endDate);
+
+    return {
+      calendarId: calendar.getId(),
+      calendarName: calendar.getName(),
+      timezone: range.timezone,
+      events: events.map(function (event) {
+        return {
+          id: event.getId(),
+          title: event.getTitle(),
+          startDate: event.getStartTime(),
+          endDate: event.getEndTime(),
+          isAllDay: event.isAllDayEvent()
+        };
+      }).sort(function (a, b) {
+        return a.startDate.getTime() - b.startDate.getTime();
+      })
+    };
+  }
+
   function resolveCalendarId_(hint, config) {
     var map = JotBotConfig.parseJsonMap(config.calendarMapJson);
     var normalized = String(hint || "").toLowerCase().trim();
     if (normalized && map[normalized]) return map[normalized];
     return config.defaultCalendarId || "primary";
+  }
+
+  function getCalendar_(calendarId) {
+    return CalendarApp.getCalendarById(calendarId) || CalendarApp.getDefaultCalendar();
+  }
+
+  function buildTodayRange_(timezone) {
+    var zone = timezone || Session.getScriptTimeZone() || "UTC";
+    var today = Utilities.formatDate(new Date(), zone, "yyyy-MM-dd");
+    var startDate = new Date(today + "T00:00:00");
+    var endDate = new Date(today + "T23:59:59");
+    return {
+      timezone: zone,
+      startDate: startDate,
+      endDate: endDate
+    };
   }
 
   function resolveColorName_(hint, priority, config) {
@@ -53,6 +93,7 @@ var JotBotCalendar = (function () {
   }
 
   return {
-    createEventFromDraft: createEventFromDraft
+    createEventFromDraft: createEventFromDraft,
+    listEventsForToday: listEventsForToday
   };
 })();

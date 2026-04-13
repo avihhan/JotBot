@@ -5,6 +5,9 @@ var JotBotRules = (function () {
     if (/#\s*(add\s*event|addevent|event)\b/.test(normalized)) {
       return { command: "add_event", rawText: raw };
     }
+    if (/#\s*(list\s*today|agenda)\b/.test(normalized)) {
+      return { command: "list_today", rawText: raw };
+    }
     if (/#\s*(note|jot)\b/.test(normalized)) {
       return { command: "note", rawText: raw };
     }
@@ -14,6 +17,7 @@ var JotBotRules = (function () {
   function stripCommandTag(text) {
     return String(text || "")
       .replace(/#\s*(add\s*event|addevent|event)\b/gi, "")
+      .replace(/#\s*(list\s*today|agenda)\b/gi, "")
       .replace(/#\s*(note|jot)\b/gi, "")
       .trim();
   }
@@ -99,6 +103,24 @@ var JotBotRules = (function () {
   function buildConfirmationMessage(eventTitle, startDate, timezone) {
     var when = Utilities.formatDate(startDate, timezone || "UTC", "EEE, MMM d h:mm a");
     return "Added: " + eventTitle + " — " + when;
+  }
+
+  function buildAgendaMessage(events, timezone, calendarLabel) {
+    var list = Array.isArray(events) ? events : [];
+    var label = calendarLabel ? " for " + calendarLabel : "";
+
+    if (list.length === 0) {
+      return "No events today" + label + ".";
+    }
+
+    var lines = ["Today's agenda" + label + ":"];
+    list.forEach(function (event) {
+      var startLabel = event.isAllDay
+        ? "All day"
+        : Utilities.formatDate(event.startDate, timezone || "UTC", "h:mm a");
+      lines.push(startLabel + " - " + event.title);
+    });
+    return lines.join("\n");
   }
 
   function validateNoteDraft(draft) {
@@ -194,6 +216,7 @@ function extractTagsFromText_(text) {
     validateAndNormalizeDraft: validateAndNormalizeDraft,
     buildClarificationMessage: buildClarificationMessage,
     buildConfirmationMessage: buildConfirmationMessage,
+    buildAgendaMessage: buildAgendaMessage,
     validateNoteDraft: validateNoteDraft,
     buildNoteConfirmationMessage: buildNoteConfirmationMessage,
     buildDirectNoteDraft: buildDirectNoteDraft,

@@ -32,6 +32,7 @@ function doPost(e) {
 var JotBotApp = (function () {
   var commandHandlers_ = {
     add_event: processAddEvent_,
+    list_today: processListToday_,
     note: processNote_
   };
 
@@ -206,6 +207,23 @@ function processNote_(message, config) {
     var confirmation = JotBotRules.buildConfirmationMessage(created.title, created.startDate, created.timezone);
     JotBotWhatsApp.sendTextMessage(message.from, confirmation, message.id);
     console.log(JSON.stringify({ type: "event_created", messageId: message.id, eventId: created.eventId, calendarId: created.calendarId }));
+  }
+
+  function processListToday_(message, config) {
+    try {
+      var agenda = JotBotCalendar.listEventsForToday(config.defaultTimezone);
+      var response = JotBotRules.buildAgendaMessage(agenda.events, agenda.timezone, agenda.calendarName);
+      JotBotWhatsApp.sendTextMessage(message.from, response, message.id);
+      console.log(JSON.stringify({ type: "agenda_listed", messageId: message.id, count: agenda.events.length, calendarId: agenda.calendarId }));
+    } catch (err) {
+      console.error("Agenda listing failed:", err);
+      appendDeadLetter("agenda_listing_failure", { message: message, error: String(err) });
+      JotBotWhatsApp.sendTextMessage(
+        message.from,
+        "Could not fetch today's events. Please try again.",
+        message.id
+      );
+    }
   }
 
   function isDuplicateMessage_(messageId, ttlSeconds) {
