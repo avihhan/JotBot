@@ -32,7 +32,12 @@ var JotBotConfig = (function () {
       firestoreDatabaseId: props.getProperty("FIRESTORE_DATABASE_ID") || "(default)",
       firestoreIdempotencyCollection: props.getProperty("FIRESTORE_IDEMPOTENCY_COLLECTION") || "jotbot_idempotency",
       gcpServiceAccountJson: props.getProperty("GCP_SERVICE_ACCOUNT_JSON") || "",
-      cancelTtlSeconds: Number(props.getProperty("CANCEL_TTL_SECONDS") || "900")
+      cancelTtlSeconds: Number(props.getProperty("CANCEL_TTL_SECONDS") || "900"),
+      defaultTaskListId: props.getProperty("DEFAULT_TASK_LIST_ID") || "@default",
+      gcpBucketName: props.getProperty("GCP_BUCKET_NAME") || "",
+      geminiFallbackModel: props.getProperty("GEMINI_FALLBACK_MODEL") || "gemini-1.5-flash",
+      categoryColorMapJson: props.getProperty("CATEGORY_COLOR_MAP_JSON") || "{}",
+      adminPhoneNumbers: props.getProperty("ADMIN_PHONE_NUMBERS") || ""
     };
   }
 

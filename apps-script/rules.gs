@@ -8,11 +8,17 @@ var JotBotRules = (function () {
     if (/#\s*(note|jot)\b/.test(normalized)) {
       return { command: "note", rawText: raw };
     }
+    if (/#\s*(add\s*task|addtask|task|todo)\b/.test(normalized)) {
+      return { command: "add_task", rawText: raw };
+    }
     if (/#\s*(cancel|delete)\b/.test(normalized)) {
       return { command: "cancel", rawText: raw };
     }
     if (/#\s*help\b/.test(normalized)) {
       return { command: "help", rawText: raw };
+    }
+    if (/^\/\s*(health|status)\b/.test(normalized)) {
+      return { command: "health", rawText: raw };
     }
     return { command: "none", rawText: raw };
   }
@@ -21,6 +27,7 @@ var JotBotRules = (function () {
     return String(text || "")
       .replace(/#\s*(add\s*event|addevent|event)\b/gi, "")
       .replace(/#\s*(note|jot)\b/gi, "")
+      .replace(/#\s*(add\s*task|addtask|task|todo)\b/gi, "")
       .replace(/#\s*(cancel|delete)\b/gi, "")
       .replace(/#\s*help\b/gi, "")
       .trim();
@@ -125,6 +132,24 @@ var JotBotRules = (function () {
     return "Note saved.";
   }
 
+  function validateTaskDraft(draft) {
+    var d = clone_(draft || {});
+    d.title = (d.title || "").trim();
+    d.description = (d.description || "").trim();
+    if (!d.title) {
+      return { ok: false, draft: d, missingFields: ["title"] };
+    }
+    return { ok: true, draft: d, missingFields: [] };
+  }
+
+  function buildTaskConfirmationMessage(title, dueDate, timezone) {
+    if (dueDate) {
+      var when = Utilities.formatDate(dueDate, timezone || "UTC", "EEE, MMM d h:mm a");
+      return "Task created: " + title + " — due " + when;
+    }
+    return "Task created: " + title;
+  }
+
   function buildHelpMessage() {
     return [
       "\ud83e\udd16 *JotBot Commands:*",
@@ -132,12 +157,17 @@ var JotBotRules = (function () {
       "\u2022 `#add event <details>` \u2014 Schedule a Google Calendar event.",
       '  _Example: "#add event Team sync tomorrow 3pm high priority"_',
       "",
+      "\u2022 `#add task <details>` \u2014 Create a Google Tasks to-do.",
+      '  _Example: "#add task Buy groceries by Friday"_',
+      "",
       "\u2022 `#note <text>` \u2014 Save a quick note to Google Sheets.",
       '  _Example: "#note Call dentist next week"_',
       "",
-      "\u2022 `#cancel` \u2014 Delete the last event I created for you.",
+      "\u2022 `#cancel` \u2014 Delete the last event or task I created for you.",
       "",
-      "\u2022 `#help` \u2014 Show this message."
+      "\u2022 `#help` \u2014 Show this message.",
+      "",
+      "\u2022 `/health` \u2014 (Admin only) Check system status."
     ].join("\n");
   }
 
@@ -175,6 +205,8 @@ var JotBotRules = (function () {
     buildConfirmationMessage: buildConfirmationMessage,
     validateNoteDraft: validateNoteDraft,
     buildNoteConfirmationMessage: buildNoteConfirmationMessage,
+    validateTaskDraft: validateTaskDraft,
+    buildTaskConfirmationMessage: buildTaskConfirmationMessage,
     buildHelpMessage: buildHelpMessage
   };
 })();

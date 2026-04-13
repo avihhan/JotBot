@@ -6,14 +6,21 @@ var JotBotWhatsApp = (function () {
       (entry.changes || []).forEach(function (change) {
         var value = change.value || {};
         (value.messages || []).forEach(function (msg) {
+          var caption = "";
+          if (msg.image && msg.image.caption) caption = msg.image.caption;
+          else if (msg.document && msg.document.caption) caption = msg.document.caption;
+
           out.push({
             id: msg.id || "",
             from: msg.from || "",
             timestamp: msg.timestamp || "",
             type: msg.type || "",
             text: msg.text && msg.text.body ? msg.text.body : "",
-            caption: msg.image && msg.image.caption ? msg.image.caption : "",
+            caption: caption,
             imageId: msg.image && msg.image.id ? msg.image.id : "",
+            documentId: msg.document && msg.document.id ? msg.document.id : "",
+            documentFilename: msg.document && msg.document.filename ? msg.document.filename : "",
+            documentMimeType: msg.document && msg.document.mime_type ? msg.document.mime_type : "",
             raw: msg
           });
         });

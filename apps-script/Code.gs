@@ -32,9 +32,11 @@ function doPost(e) {
 var JotBotApp = (function () {
   var commandHandlers_ = {
     add_event: processAddEvent_,
+    add_task: processAddTask_,
     note: processNote_,
     cancel: processCancel_,
-    help: processHelp_
+    help: processHelp_,
+    health: processHealth_
   };
 
   function handleWebhook(payload) {
@@ -143,19 +145,28 @@ var JotBotApp = (function () {
 
   function processAddEvent_(message, config) {
     var timezone = config.defaultTimezone;
+    var msgTimestamp = message.timestamp ? Number(message.timestamp) * 1000 : null;
     var messageTextRaw = message.caption || message.text || "";
     var messageText = JotBotRules.stripCommandTag(messageTextRaw);
 
     var textDraft = {};
-    var imageDraft = {};
+    var mediaDraft = {};
     try {
       textDraft = messageText
-        ? JotBotGemini.extractEventDraftFromText(messageText, timezone)
+        ? JotBotGemini.extractEventDraftFromText(messageText, timezone, msgTimestamp)
         : {};
 
-      if (message.imageId) {
-        var media = JotBotWhatsApp.downloadMedia(message.imageId);
-        imageDraft = JotBotGemini.extractEventDraftFromImage(media.base64, media.mimeType, timezone);
+      var mediaId = message.imageId || message.documentId;
+      var gcsUrl = null;
+      if (mediaId) {
+        var media = JotBotWhatsApp.downloadMedia(mediaId);
+        mediaDraft = JotBotGemini.extractEventDraftFromMedia(media.base64, media.mimeType, timezone, msgTimestamp);
+        if (JotBotGCS.isConfigured(config)) {
+          var ext = (media.mimeType || "").split("/")[1] || "bin";
+          var filename = "events/" + message.id + "." + ext;
+          var objectName = JotBotGCS.uploadFile(media.bytes, media.mimeType, filename, config);
+          if (objectName) gcsUrl = JotBotGCS.getSignedUrl(objectName, config);
+        }
       }
     } catch (err) {
       console.error("Gemini/media extraction failed:", err);
@@ -168,9 +179,12 @@ var JotBotApp = (function () {
       return;
     }
 
-    var merged = JotBotRules.mergeEventDrafts(imageDraft, textDraft);
+    var merged = JotBotRules.mergeEventDrafts(mediaDraft, textDraft);
     var hints = JotBotRules.parseHintsFromText(messageText);
     merged = JotBotRules.applyHints(merged, hints);
+    if (gcsUrl) {
+      merged.description = (merged.description || "") + (merged.description ? "\n\nAttachment: " : "Attachment: ") + gcsUrl;
+    }
 
     var normalized = JotBotRules.validateAndNormalizeDraft(
       merged,
@@ -195,6 +209,72 @@ var JotBotApp = (function () {
         type: "event",
         itemId: created.eventId,
         calendarId: created.calendarId,
+        title: created.title,
+        category: created.category || ""
+      }, config);
+    }
+  }
+
+  function processAddTask_(message, config) {
+    var timezone = config.defaultTimezone;
+    var msgTimestamp = message.timestamp ? Number(message.timestamp) * 1000 : null;
+    var messageTextRaw = message.caption || message.text || "";
+    var messageText = JotBotRules.stripCommandTag(messageTextRaw);
+
+    var draft = {};
+    try {
+      draft = messageText
+        ? JotBotGemini.extractTaskDraftFromText(messageText, timezone, msgTimestamp)
+        : {};
+    } catch (err) {
+      console.error("Gemini task extraction failed:", err);
+      appendDeadLetter("task_extraction_failure", { message: message, error: String(err) });
+      JotBotWhatsApp.sendTextMessage(
+        message.from,
+        "Could not process the task. Please try again.",
+        message.id
+      );
+      return;
+    }
+
+    if (!draft.title && messageText) {
+      draft.title = messageText;
+    }
+
+    var validated = JotBotRules.validateTaskDraft(draft);
+    if (!validated.ok) {
+      JotBotWhatsApp.sendTextMessage(
+        message.from,
+        "I need at least a title for the task. Reply with #add task followed by your task.",
+        message.id
+      );
+      return;
+    }
+
+    var created;
+    try {
+      created = JotBotTasks.createTask(validated.draft, config);
+    } catch (err) {
+      console.error("JotBotTasks.createTask failed:", err);
+      appendDeadLetter("task_creation_failure", { message: message, draft: validated.draft, error: String(err) });
+      JotBotWhatsApp.sendTextMessage(
+        message.from,
+        "Could not create the task. Please try again.",
+        message.id
+      );
+      return;
+    }
+
+    var dueDate = validated.draft.due_datetime_iso ? new Date(validated.draft.due_datetime_iso) : null;
+    var confirmation = JotBotRules.buildTaskConfirmationMessage(created.title, dueDate, timezone);
+    JotBotWhatsApp.sendTextMessage(message.from, confirmation, message.id);
+    console.log(JSON.stringify({ type: "task_created", messageId: message.id, taskId: created.taskId }));
+
+    if (JotBotFirestore.isConfigured(config)) {
+      JotBotFirestore.saveLastAction(message.from, {
+        type: "task",
+        itemId: created.taskId,
+        taskListId: created.taskListId,
         title: created.title
       }, config);
     }
@@ -232,6 +312,8 @@ var JotBotApp = (function () {
         if (event) {
           event.deleteEvent();
         }
+      } else if (lastAction.type === "task") {
+        JotBotTasks.deleteTask(lastAction.itemId, lastAction.taskListId || "@default");
       }
     } catch (err) {
       console.error("processCancel_ deletion failed:", err);
@@ -244,6 +326,62 @@ var JotBotApp = (function () {
     var title = lastAction.title ? ' "' + lastAction.title + '"' : "";
     JotBotWhatsApp.sendTextMessage(message.from, "\ud83d\uddd1\ufe0f Successfully cancelled" + title + ".", message.id);
     console.log(JSON.stringify({ type: "event_cancelled", messageId: message.id, itemId: lastAction.itemId }));
+  }
+
+  function processHealth_(message, config) {
+    var adminNumbers = (config.adminPhoneNumbers || "")
+      .split(",")
+      .map(function (n) { return String(n).replace(/[^\d+]/g, "").trim(); })
+      .filter(Boolean);
+    var sender = String(message.from || "").replace(/[^\d+]/g, "").trim();
+    if (adminNumbers.length > 0 && adminNumbers.indexOf(sender) === -1) {
+      JotBotWhatsApp.sendTextMessage(message.from, JotBotRules.buildHelpMessage(), message.id);
+      return;
+    }
+
+    var results = [];
+
+    try {
+      if (JotBotFirestore.isConfigured(config)) {
+        var token = CacheService.getScriptCache().get("jotbot_firestore_oauth");
+        results.push(token ? "\ud83d\udfe2 Firestore: OK" : "\ud83d\udfe1 Firestore: Token not cached");
+      } else {
+        results.push("\u26aa Firestore: Not configured");
+      }
+    } catch (e) {
+      results.push("\ud83d\udd34 Firestore: " + String(e).substring(0, 60));
+    }
+
+    try {
+      var waUrl = "https://graph.facebook.com/" + config.waApiVersion + "/" + config.waPhoneNumberId;
+      var waRes = UrlFetchApp.fetch(waUrl, {
+        method: "get",
+        headers: { Authorization: "Bearer " + config.waAccessToken },
+        muteHttpExceptions: true
+      });
+      results.push(waRes.getResponseCode() === 200 ? "\ud83d\udfe2 WhatsApp API: OK" : "\ud83d\udd34 WhatsApp API: " + waRes.getResponseCode());
+    } catch (e) {
+      results.push("\ud83d\udd34 WhatsApp API: " + String(e).substring(0, 60));
+    }
+
+    try {
+      var geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" +
+        encodeURIComponent(config.geminiModel) +
+        "?key=" + encodeURIComponent(config.geminiApiKey);
+      var geminiRes = UrlFetchApp.fetch(geminiUrl, { method: "get", muteHttpExceptions: true });
+      results.push(geminiRes.getResponseCode() === 200 ? "\ud83d\udfe2 Gemini API: OK" : "\ud83d\udd34 Gemini API: " + geminiRes.getResponseCode());
+    } catch (e) {
+      results.push("\ud83d\udd34 Gemini API: " + String(e).substring(0, 60));
+    }
+
+    if (JotBotGCS.isConfigured(config)) {
+      results.push("\ud83d\udfe2 GCS: Configured (" + config.gcpBucketName + ")");
+    } else {
+      results.push("\u26aa GCS: Not configured");
+    }
+
+    var statusMessage = "*JotBot System Status*\n\n" + results.join("\n");
+    JotBotWhatsApp.sendTextMessage(message.from, statusMessage, message.id);
   }
 
   function isDuplicateMessage_(messageId, config) {

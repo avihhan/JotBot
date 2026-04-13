@@ -192,15 +192,16 @@ var JotBotFirestore = (function () {
       config.firestoreIdempotencyCollection,
       senderDocId_(sender)
     );
-    var body = {
-      fields: {
-        type: { stringValue: actionData.type || "" },
-        itemId: { stringValue: actionData.itemId || "" },
-        calendarId: { stringValue: actionData.calendarId || "" },
-        title: { stringValue: actionData.title || "" },
-        createdAt: { timestampValue: new Date().toISOString() }
-      }
+    var fields = {
+      type: { stringValue: actionData.type || "" },
+      itemId: { stringValue: actionData.itemId || "" },
+      title: { stringValue: actionData.title || "" },
+      category: { stringValue: actionData.category || "" },
+      createdAt: { timestampValue: new Date().toISOString() }
     };
+    if (actionData.calendarId) fields.calendarId = { stringValue: actionData.calendarId };
+    if (actionData.taskListId) fields.taskListId = { stringValue: actionData.taskListId };
+    var body = { fields: fields };
     var res = UrlFetchApp.fetch(url, {
       method: "patch",
       muteHttpExceptions: true,
@@ -237,7 +238,9 @@ var JotBotFirestore = (function () {
         type: (f.type && f.type.stringValue) || "",
         itemId: (f.itemId && f.itemId.stringValue) || "",
         calendarId: (f.calendarId && f.calendarId.stringValue) || "",
+        taskListId: (f.taskListId && f.taskListId.stringValue) || "",
         title: (f.title && f.title.stringValue) || "",
+        category: (f.category && f.category.stringValue) || "",
         createdAt: (f.createdAt && f.createdAt.timestampValue) ? new Date(f.createdAt.timestampValue) : null
       };
     } catch (e) {
